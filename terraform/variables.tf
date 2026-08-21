@@ -1,3 +1,13 @@
+# Inputs to this configuration. Values come from two places:
+#
+#   - terraform.auto.tfvars   environment-specific but not secret (node names,
+#                             IPs, sizing). Auto-loaded; gitignored.
+#   - TF_VAR_* env vars       connection details and keys, from the repo-root
+#                             .env file. See README.md.
+#
+# A variable with no default is required: Terraform will refuse to run without
+# it rather than guessing.
+
 variable "proxmox_url" {
   type        = string
   description = "Proxmox API URL, supplied via TF_VAR_proxmox_url."
@@ -48,6 +58,27 @@ variable "ssh_public_key" {
 variable "ssh_private_key_file" {
   type        = string
   description = "Path to the private key matching ssh_public_key, used by the bootstrap provisioners. Supplied via TF_VAR_ssh_private_key_file."
+}
+
+variable "cpu_type" {
+  type        = string
+  default     = "host"
+  description = <<-EOT
+    QEMU CPU model for cluster nodes.
+
+    This must be set explicitly: the provider defaults to "qemu64", a baseline
+    model that lacks SSE4.2/POPCNT and therefore does not meet the x86-64-v2
+    microarchitecture level. Calico v3.32+ ships v2-only binaries and its
+    calico-node pods crash-loop on a qemu64 node, leaving every node NotReady.
+    A cpu_type set on the Packer template does NOT carry over -- the value here
+    overrides it.
+
+    "host" passes the physical CPU's features straight through and is the
+    fastest option. The tradeoff is portability: it ties these VMs to this CPU
+    family, so live-migrating to a host with a different CPU can fail. On a
+    mixed-CPU cluster, use a named baseline that is still v2 or better
+    (e.g. "x86-64-v2-AES") instead.
+  EOT
 }
 
 variable "pod_network_cidr" {

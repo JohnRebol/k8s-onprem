@@ -1,4 +1,18 @@
 #cloud-config
+# Ubuntu autoinstall answer file: every prompt the installer would ask a human,
+# answered ahead of time so the install runs unattended.
+#
+# Packer serves this over a temporary web server and points the installer at it
+# (see boot_command in ubuntu-k8s.pkr.hcl). The dollar-brace placeholders below
+# are filled in by Packer's templatefile() -- so the SSH key and password hash
+# come from .env and are never committed here.
+#
+# Note: templatefile() substitutes the whole file, comments included. Writing a
+# literal placeholder here, even in a comment, would be evaluated as an
+# expression and fail the build.
+#
+# This configures the machine only up to first boot. Everything Kubernetes-
+# specific happens afterwards, in scripts/provision-k8s.sh.
 
 autoinstall:
   version: 1
@@ -6,11 +20,16 @@ autoinstall:
   keyboard:
     layout: us
 
+  # DHCP during the build only: this VM just needs to reach the internet to
+  # fetch packages. Real node addressing is assigned later by cloud-init, from
+  # values Terraform passes per-node.
   network:
     version: 2
     ethernets:
       any-ens:
         match:
+          # Interface names vary (ens18, eth0, ...), so match the family
+          # rather than hardcoding one.
           name: en*
         dhcp4: true
 
@@ -20,25 +39,39 @@ autoinstall:
     authorized-keys:
       - "${ssh_public_key}"
 
-
-
   identity:
+    # Placeholder hostname. Clones get their real one from cloud-init; if you
+    # ever see a live node still called k8s-golden, cloud-init did not run.
     hostname: k8s-golden
     username: ${ssh_username}
+    # A crypt(3) hash, not a plaintext password. Required by autoinstall even
+    # though access is by SSH key.
     password: ${ssh_password_hash}
+
   storage:
     layout:
       name: direct
 
+  # Minimal set needed to reach the machine and manage it. Everything else is
+  # installed by the provisioner, where changes do not require re-running the
+  # whole OS install to test.
   packages:
-  - openssh-server
-  - qemu-guest-agent
+    - openssh-server
+    - qemu-guest-agent
 
   late-commands:
+    # Runs at the end of the install, against the installed system mounted at
+    # /target.
+    #
+    # NOPASSWD lets Packer's provisioner run sudo without a TTY to type into.
+    # env_keep is load-bearing: sudo scrubs the environment by default, and
+    # without this the variables Packer passes would never reach the
+    # provisioning script. See the provisioner block in ubuntu-k8s.pkr.hcl.
     - |
       cat > /target/etc/sudoers.d/90-${ssh_username} <<'EOF'
       ${ssh_username} ALL=(ALL) NOPASSWD:ALL
       Defaults:${ssh_username} env_keep += "KUBERNETES_REPO_VERSION HOLD_KUBERNETES_PACKAGES"
       EOF
+    # sudo refuses to read a sudoers file with looser permissions than 0440.
     - chmod 440 /target/etc/sudoers.d/90-${ssh_username}
     - curtin in-target -- systemctl enable qemu-guest-agent

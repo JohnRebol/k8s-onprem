@@ -1,4 +1,17 @@
+# Deploys the Kubernetes cluster by cloning the Packer golden image (template
+# 9000) once per node, then bootstrapping kubeadm on top.
+#
+# Read order: this file creates the VMs and wires up the bootstrap; variables.tf
+# defines the inputs; scripts/ holds what actually runs on the nodes.
+
 locals {
+  # Derives sequential worker IPs by incrementing the last octet of
+  # worker_ip_start: "10.10.3.241" with worker_count = 3 becomes .241/.242/.243.
+  #
+  # This only walks the final octet, so a run that would cross a .255 boundary
+  # produces an invalid address rather than rolling into the next subnet. Fine
+  # for a handful of nodes; if the cluster ever grows past that, list the IPs
+  # explicitly instead.
   worker_ip_octets = split(".", var.worker_ip_start)
   worker_ips = [
     for i in range(var.worker_count) :
@@ -9,11 +22,16 @@ locals {
   ]
 }
 
+# The control-plane node: runs the Kubernetes API server, scheduler, and etcd.
+# Created first because the workers need a cluster to join.
 resource "proxmox_virtual_environment_vm" "controller" {
   name      = "k8s-controller"
   node_name = var.proxmox_node
   vm_id     = var.controller_vm_id
 
+  # full = true copies the disk outright. A linked clone would be faster and
+  # smaller but stays dependent on the template forever -- meaning the template
+  # could not be rebuilt or deleted without breaking live nodes.
   clone {
     vm_id     = var.k8s_template_vm_id
     node_name = var.proxmox_node
@@ -26,6 +44,7 @@ resource "proxmox_virtual_environment_vm" "controller" {
 
   cpu {
     cores = var.controller_cores
+    type  = var.cpu_type
   }
 
   memory {
@@ -36,6 +55,15 @@ resource "proxmox_virtual_environment_vm" "controller" {
     bridge = var.network_bridge
   }
 
+  # cloud-init. Proxmox writes these values to a small virtual CD-ROM attached
+  # to the VM; on first boot the guest reads it and applies its own hostname,
+  # IP, DNS, and SSH key. That is how one identical template becomes four
+  # differently-configured nodes.
+  #
+  # This only works because the image was "unsealed" during the Packer build --
+  # Ubuntu's installer otherwise disables cloud-init after autoinstall, and the
+  # nodes would silently come up on DHCP with the template's hostname. See the
+  # cloud-init section of scripts/provision-k8s.sh.
   initialization {
     datastore_id = var.datastore_id
 
@@ -60,6 +88,7 @@ resource "proxmox_virtual_environment_vm" "controller" {
     type = "l26"
   }
 
+  # How the provisioners below reach this node once it boots.
   connection {
     type        = "ssh"
     host        = var.controller_ip
@@ -68,6 +97,10 @@ resource "proxmox_virtual_environment_vm" "controller" {
     timeout     = "5m"
   }
 
+  # Provisioners run ONCE, when the resource is first created -- never on later
+  # applies. Changing these scripts therefore does nothing to a node that
+  # already exists; the node has to be recreated with
+  # `terraform apply -replace=...` for the new version to run. See README.md.
   provisioner "file" {
     content = templatefile("${path.module}/scripts/init-control-plane.sh.tpl", {
       username         = var.ssh_username
@@ -85,6 +118,14 @@ resource "proxmox_virtual_environment_vm" "controller" {
 
 # Pull the kubeadm join command off the control-plane node so workers can join
 # without a hardcoded token.
+#
+# A node joins a cluster by presenting a short-lived bootstrap token plus a hash
+# of the cluster's CA certificate. Both are only known after `kubeadm init` has
+# run, so they cannot be written into this config ahead of time -- they have to
+# be read back off the control plane at apply time and handed to the workers.
+#
+# terraform_data is a built-in resource that exists purely to hang provisioners
+# and ordering off of; it manages no real infrastructure.
 resource "terraform_data" "join_command" {
   # Ordering via depends_on alone would only cover the first creation. Keying
   # on the control-plane's id means a rebuilt control plane (new token, new CA
@@ -98,6 +139,11 @@ resource "terraform_data" "join_command" {
   }
 }
 
+# The worker nodes, where application workloads actually run.
+#
+# count creates worker_count copies of this resource, addressed as worker[0],
+# worker[1], ... count.index is the 0-based position, used to give each one a
+# distinct name, VM ID, and IP.
 resource "proxmox_virtual_environment_vm" "worker" {
   count = var.worker_count
 
@@ -117,6 +163,7 @@ resource "proxmox_virtual_environment_vm" "worker" {
 
   cpu {
     cores = var.worker_cores
+    type  = var.cpu_type
   }
 
   memory {
