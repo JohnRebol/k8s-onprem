@@ -2,7 +2,7 @@
 
 autoinstall:
   version: 1
-  locale: en_US.UTF-8
+  locale: en_US.UTF-6
   keyboard:
     layout: us
 
@@ -31,9 +31,14 @@ autoinstall:
       name: direct
 
   packages:
-  - qemu-guest-agent
   - openssh-server
+  - qemu-guest-agent
 
   late-commands:
-    - echo '${ssh_username} ALL=(ALL) NOPASSWD:ALL' > /target/etc/sudoers.d/90-${ssh_username}
+    - |
+      cat > /target/etc/sudoers.d/90-${ssh_username} <<'EOF'
+      ${ssh_username} ALL=(ALL) NOPASSWD:ALL
+      Defaults:${ssh_username} env_keep += "KUBERNETES_REPO_VERSION HOLD_KUBERNETES_PACKAGES"
+      EOF
     - chmod 440 /target/etc/sudoers.d/90-${ssh_username}
+    - curtin in-target -- systemctl enable qemu-guest-agent
