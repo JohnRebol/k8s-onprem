@@ -45,6 +45,23 @@ variable "ssh_public_key" {
   description = "SSH public key installed for ssh_username via cloud-init."
 }
 
+variable "ssh_private_key_file" {
+  type        = string
+  description = "Path to the private key matching ssh_public_key, used by the bootstrap provisioners. Supplied via TF_VAR_ssh_private_key_file."
+}
+
+variable "pod_network_cidr" {
+  type        = string
+  default     = "192.168.0.0/16"
+  description = "Pod network CIDR passed to kubeadm init. The default matches Calico's own default and must not overlap the node network."
+}
+
+variable "calico_version" {
+  type        = string
+  default     = "v3.32.1"
+  description = "Calico release whose manifest is applied as the cluster CNI."
+}
+
 variable "controller_vm_id" {
   type        = number
   description = "VM ID for the control-plane node."

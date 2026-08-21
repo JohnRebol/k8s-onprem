@@ -59,6 +59,43 @@ resource "proxmox_virtual_environment_vm" "controller" {
   operating_system {
     type = "l26"
   }
+
+  connection {
+    type        = "ssh"
+    host        = var.controller_ip
+    user        = var.ssh_username
+    private_key = file(var.ssh_private_key_file)
+    timeout     = "5m"
+  }
+
+  provisioner "file" {
+    content = templatefile("${path.module}/scripts/init-control-plane.sh.tpl", {
+      username         = var.ssh_username
+      control_plane_ip = var.controller_ip
+      pod_network_cidr = var.pod_network_cidr
+      calico_version   = var.calico_version
+    })
+    destination = "/tmp/init-control-plane.sh"
+  }
+
+  provisioner "remote-exec" {
+    inline = ["sudo bash /tmp/init-control-plane.sh"]
+  }
+}
+
+# Pull the kubeadm join command off the control-plane node so workers can join
+# without a hardcoded token.
+resource "terraform_data" "join_command" {
+  # Ordering via depends_on alone would only cover the first creation. Keying
+  # on the control-plane's id means a rebuilt control plane (new token, new CA
+  # hash) refetches, instead of leaving workers to join a cluster that no
+  # longer exists.
+  triggers_replace = [proxmox_virtual_environment_vm.controller.id]
+
+  provisioner "local-exec" {
+    interpreter = ["bash", "-c"]
+    command     = "bash ${path.module}/scripts/fetch-join-command.sh ${var.ssh_username} ${var.controller_ip} ${var.ssh_private_key_file} ${path.module}/kubeadm-join-command.sh"
+  }
 }
 
 resource "proxmox_virtual_environment_vm" "worker" {
@@ -113,4 +150,28 @@ resource "proxmox_virtual_environment_vm" "worker" {
   operating_system {
     type = "l26"
   }
+
+  connection {
+    type        = "ssh"
+    host        = local.worker_ips[count.index]
+    user        = var.ssh_username
+    private_key = file(var.ssh_private_key_file)
+    timeout     = "5m"
+  }
+
+  provisioner "file" {
+    source      = "${path.module}/kubeadm-join-command.sh"
+    destination = "/tmp/kubeadm-join-command.sh"
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      # Same reason as the control plane: kubeadm registers the node under its
+      # hostname, so don't join until cloud-init has finished setting it.
+      "cloud-init status --wait >/dev/null 2>&1 || true",
+      "sudo bash /tmp/kubeadm-join-command.sh",
+    ]
+  }
+
+  depends_on = [terraform_data.join_command]
 }

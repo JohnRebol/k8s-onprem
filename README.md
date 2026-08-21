@@ -15,6 +15,7 @@ PKR_VAR_ssh_public_key='...'
 PKR_VAR_ssh_password_hash='...'
 PKR_VAR_ssh_private_key_file='/absolute/path/to/matching/private/key'
 TF_VAR_ssh_public_key='...'
+TF_VAR_ssh_private_key_file='/absolute/path/to/matching/private/key'
 ```
 
 Load it before running either tool:

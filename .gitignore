@@ -7,6 +7,8 @@ packer/variables.auto.pkrvars.hcl
 packer/*.iso
 terraform/*.tfvars
 terraform/*.tfvars.json
+# Contains a live kubeadm bootstrap token and the cluster CA hash.
+terraform/kubeadm-join-command.sh
 terraform/.terraform/
 terraform/terraform.tfstate
 terraform/terraform.tfstate.backup
