@@ -1,3 +1,26 @@
+# Scratch notes and secrets.
 .variables_to_set.txt
+.env
+
+# Packer
+# Real variable files hold environment-specific values; only the .example is
+# tracked, so newcomers copy it rather than inheriting someone else's IPs.
 packer/*.pkrvars.hcl
 packer/*.pkrvars.json
+# Packer's local ISO cache. Multi-GB, re-downloadable, and unused entirely when
+# iso_download_pve = true (Proxmox fetches the ISO itself, server-side).
+packer/*.iso
+packer/downloaded_iso_path/
+
+# Terraform
+terraform/*.tfvars
+terraform/*.tfvars.json
+# Generated at apply time: carries a live kubeadm bootstrap token and the
+# cluster CA hash.
+terraform/kubeadm-join-command.sh
+# Provider binaries, plus state -- state records real resource IDs and can
+# contain sensitive values, so it stays local until you adopt a remote backend.
+terraform/.terraform/
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/crash.log

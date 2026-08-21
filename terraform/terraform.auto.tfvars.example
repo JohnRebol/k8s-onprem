@@ -1,0 +1,31 @@
+# proxmox_url, proxmox_api_token_id, proxmox_api_token_secret, ssh_public_key,
+# and ssh_private_key_file are supplied via .env (TF_VAR_*) — see repo-root
+# README.md.
+proxmox_node   = "pve2"
+datastore_id   = "nvmePCI_ZFS"
+network_bridge = "vmbr0"
+
+k8s_template_vm_id = 9000
+ssh_username       = "ubuntu"
+
+controller_vm_id  = 210
+controller_ip     = "10.10.3.240"
+controller_cores  = 4
+controller_memory = 16384
+
+worker_vm_id_start = 211
+worker_ip_start     = "10.10.3.241"
+worker_count        = 3
+worker_cores        = 4
+worker_memory       = 16384  #  4096
+
+network_gateway     = "10.10.0.1"
+network_cidr_suffix = 16
+dns_servers = [
+  "1.1.1.1",
+  "8.8.8.8",
+]
+
+# Cluster bootstrap. pod_network_cidr must not overlap the node network above.
+pod_network_cidr = "192.168.0.0/16"
+calico_version   = "v3.32.1"
