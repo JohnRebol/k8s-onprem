@@ -19,6 +19,7 @@ apt-get install -y \
   ca-certificates \
   curl \
   gpg \
+  crictl\
   systemd-timesyncd
 
 install -d -m 0755 /etc/apt/keyrings
@@ -31,7 +32,11 @@ deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io
 EOF
 
 apt-get update
-apt-get install -y kubelet kubeadm kubectl
+# cri-tools (crictl) comes from the Kubernetes repo rather than Ubuntu's so it
+# tracks the cluster version. It talks to containerd below Kubernetes, which is
+# often the only way to see what a node is doing when the control plane itself
+# is the thing that's broken.
+apt-get install -y kubelet kubeadm kubectl cri-tools
 
 swapoff -a
 sed -ri '/\sswap\s/s/^#?/#/' /etc/fstab
@@ -54,6 +59,15 @@ install -d -m 0755 /etc/containerd
 containerd config default >/etc/containerd/config.toml
 sed -ri 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
 systemctl enable --now containerd
+
+# Point crictl at containerd. Without this it has to guess an endpoint on every
+# invocation, which it warns about and which breaks once more than one runtime
+# socket exists on the node.
+cat >/etc/crictl.yaml <<EOF
+runtime-endpoint: unix:///run/containerd/containerd.sock
+image-endpoint: unix:///run/containerd/containerd.sock
+timeout: 10
+EOF
 systemctl enable qemu-guest-agent
 systemctl enable systemd-timesyncd
 

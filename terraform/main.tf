@@ -150,6 +150,20 @@ resource "proxmox_virtual_environment_vm" "worker" {
   operating_system {
     type = "l26"
   }
+}
+
+# Joining is split out of the worker resource itself so the VMs don't inherit
+# the control plane's dependency. A worker's *existence* doesn't depend on the
+# cluster -- only its join does. Keeping them separate lets all four VMs clone
+# and boot in parallel while the control plane initializes, instead of leaving
+# the workers idle through kubeadm init and the CNI rollout.
+resource "terraform_data" "worker_join" {
+  count = var.worker_count
+
+  triggers_replace = [
+    proxmox_virtual_environment_vm.worker[count.index].id,
+    terraform_data.join_command.id,
+  ]
 
   connection {
     type        = "ssh"
@@ -172,6 +186,4 @@ resource "proxmox_virtual_environment_vm" "worker" {
       "sudo bash /tmp/kubeadm-join-command.sh",
     ]
   }
-
-  depends_on = [terraform_data.join_command]
 }
