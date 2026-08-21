@@ -33,6 +33,11 @@ variable "datastore_id" {
   description = "Proxmox datastore for the image disk."
 }
 
+variable "iso_datastore_id" {
+  type        = string
+  description = "Proxmox datastore the boot ISO is downloaded to."
+}
+
 variable "network_bridge" {
   type        = string
   description = "Proxmox network bridge."
@@ -132,7 +137,8 @@ source "proxmox-iso" "ubuntu-k8s" {
     type             = "scsi"
     iso_url          = var.ubuntu_iso_url
     iso_checksum     = var.ubuntu_iso_checksum
-    iso_storage_pool = var.datastore_id
+    iso_storage_pool = var.iso_datastore_id
+    iso_download_pve = true
     unmount          = true
   }
 

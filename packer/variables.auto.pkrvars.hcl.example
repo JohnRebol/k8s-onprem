@@ -3,6 +3,7 @@
 # — see repo-root README.md.
 proxmox_node         = "pve2"
 datastore_id         = "lvl-local"
+iso_datastore_id     = "lvl-local"
 network_bridge       = "vmbr0"
 
 ubuntu_version       = "26.04"

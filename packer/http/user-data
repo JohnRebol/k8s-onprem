@@ -2,6 +2,15 @@
 
 autoinstall:
   version: 1
+
+  ssh:
+    install-server: true
+    allow-pw: true
+    authorized-keys:
+      - "${ssh_public_key}"
+
+
+
   identity:
     hostname: k8s-golden
     username: ${ssh_username}
@@ -9,6 +18,10 @@ autoinstall:
   storage:
     layout:
       name: direct
+
+  packages:
+  - qemu-guest-agent
+  - openssh-server
 
 keyboard:
   layout: us
