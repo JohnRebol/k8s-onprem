@@ -19,7 +19,6 @@ apt-get install -y \
   ca-certificates \
   curl \
   gpg \
-  crictl\
   systemd-timesyncd
 
 install -d -m 0755 /etc/apt/keyrings
