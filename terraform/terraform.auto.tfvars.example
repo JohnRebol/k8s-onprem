@@ -1,0 +1,26 @@
+# proxmox_url, proxmox_api_token_id, proxmox_api_token_secret, and ssh_public_key
+# are supplied via .env (TF_VAR_*) — see repo-root README.md.
+proxmox_node   = "pve2"
+datastore_id   = "nvmePCI_ZFS"
+network_bridge = "vmbr0"
+
+k8s_template_vm_id = 9000
+ssh_username       = "ubuntu"
+
+controller_vm_id  = 210
+controller_ip     = "10.10.4.210"
+controller_cores  = 2
+controller_memory = 4096
+
+worker_vm_id_start = 211
+worker_ip_start     = "10.10.4.211"
+worker_count        = 3
+worker_cores        = 3
+worker_memory       = 4096
+
+network_gateway     = "10.10.0.1"
+network_cidr_suffix = 16
+dns_servers = [
+  "1.1.1.1",
+  "8.8.8.8",
+]

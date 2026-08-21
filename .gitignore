@@ -5,3 +5,9 @@ packer/*.pkrvars.json
 packer/variables.auto.pkrvars.hcl.example
 packer/variables.auto.pkrvars.hcl
 packer/*.iso
+terraform/*.tfvars
+terraform/*.tfvars.json
+terraform/.terraform/
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/crash.log
