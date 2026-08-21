@@ -113,10 +113,8 @@ source "proxmox-iso" "ubuntu-k8s" {
   scsi_controller      = "virtio-scsi-single"
   bios                 = "seabios"
   os                   = "l26"
-  # TODO: revert to cores = 2, memory = 4096 once the build/provision pipeline is verified working.
-  # Bumped for faster iteration while debugging; unnecessarily heavy for routine golden-image builds.
-  cores                = 8
-  memory               = 16384
+  cores                = 2
+  memory               = 4096
   sockets              = 1
   cpu_type             = "host"
   network_adapters {
@@ -129,11 +127,9 @@ source "proxmox-iso" "ubuntu-k8s" {
     storage_pool = var.datastore_id
     type         = "scsi"
     format       = "raw"
-    # TODO: revert to cache_mode = "none" once the pipeline is verified working.
-    # "writeback" speeds up install I/O by caching writes in host RAM, at the cost of durability
-    # guarantees if the host crashes mid-build. Fine for a throwaway build VM, but confirm whatever
-    # clones this template later sets its own (safe) cache_mode rather than inheriting this one.
-    cache_mode   = "writeback"
+    # Clones inherit this from the template rather than setting their own, so it has to be a
+    # setting that's safe for long-lived cluster nodes, not just the throwaway build VM.
+    cache_mode   = "none"
     discard      = true
     io_thread    = true
     ssd          = true
