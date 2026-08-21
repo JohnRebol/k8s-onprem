@@ -6,7 +6,7 @@ proxmox_node   = "pve2"
 datastore_id   = "nvmePCI_ZFS"
 network_bridge = "vmbr0"
 
-
+.
 ==================================================
 # Packer Golden Image
 ==================================================
