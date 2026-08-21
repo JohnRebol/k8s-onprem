@@ -1,3 +1,5 @@
 .variables_to_set.txt
 packer/*.pkrvars.hcl
 packer/*.pkrvars.json
+packer/variables.auto.pkrvars.hcl.example
+packer/variables.auto.pkrvars.hcl
