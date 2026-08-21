@@ -1,16 +1,14 @@
-proxmox_url          = "https://xx.xx.xx.xxx:8006/api2/json"
-proxmox_api_token_id = "terraform@pve!provider"
+# proxmox_url, proxmox_api_token_id, proxmox_api_token_secret, ssh_public_key,
+# ssh_password_hash, and ssh_private_key_file are supplied via .env (PKR_VAR_*)
+# — see repo-root README.md.
 proxmox_node         = "pve2"
 datastore_id         = "lvl-local"
 network_bridge       = "vmbr0"
 
 ubuntu_version       = "26.04"
 ubuntu_iso_url       = "https://releases.ubuntu.com/26.04/ubuntu-26.04-live-server-amd64.iso"
-ubuntu_iso_checksum  = "sha256:REPLACE_WITH_OFFICIAL_CHECKSUM"
+ubuntu_iso_checksum  = "file:https://releases.ubuntu.com/26.04/SHA256SUMS"
 ssh_username         = "<username>"
-ssh_public_key       = "ssh-ed25519 xxxxxxxxxxxxxxjh+CLbgU7 jreboxx@xxxxe"
-ssh_password_hash    = "REPLACE_WITH_CRYPT_PASSWORD_HASH"
-ssh_private_key_file = "/absolute/path/to/matching/private/key"
 
 k8s_template_vm_id       = 9000
 kubernetes_repo_version  = "v1.35"

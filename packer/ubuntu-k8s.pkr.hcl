@@ -9,12 +9,12 @@ packer {
 
 variable "proxmox_url" {
   type        = string
-  description = "Proxmox API URL."
+  description = "Proxmox API URL, supplied via PKR_VAR_proxmox_url."
 }
 
 variable "proxmox_api_token_id" {
   type        = string
-  description = "Proxmox API token ID."
+  description = "Proxmox API token ID, supplied via PKR_VAR_proxmox_api_token_id."
 }
 
 variable "proxmox_api_token_secret" {
@@ -51,7 +51,7 @@ variable "ubuntu_iso_url" {
 
 variable "ubuntu_iso_checksum" {
   type        = string
-  description = "Ubuntu ISO checksum in sha256:<digest> form."
+  description = "Ubuntu ISO checksum, either sha256:<digest> or file:<url-to-SHA256SUMS>."
 }
 
 variable "ssh_username" {
@@ -61,18 +61,18 @@ variable "ssh_username" {
 
 variable "ssh_public_key" {
   type        = string
-  description = "SSH public key installed for the build user."
+  description = "SSH public key installed for the build user, supplied via PKR_VAR_ssh_public_key."
 }
 
 variable "ssh_password_hash" {
   type        = string
   sensitive   = true
-  description = "Crypt(3) password hash required by Ubuntu autoinstall, supplied locally."
+  description = "Crypt(3) password hash required by Ubuntu autoinstall, supplied via PKR_VAR_ssh_password_hash."
 }
 
 variable "ssh_private_key_file" {
   type        = string
-  description = "Path to the matching SSH private key, supplied locally."
+  description = "Path to the matching SSH private key, supplied via PKR_VAR_ssh_private_key_file."
 }
 
 variable "k8s_template_vm_id" {
