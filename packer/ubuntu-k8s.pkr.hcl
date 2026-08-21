@@ -113,8 +113,8 @@ source "proxmox-iso" "ubuntu-k8s" {
   scsi_controller      = "virtio-scsi-single"
   bios                 = "seabios"
   os                   = "l26"
-  cores                = 2
-  memory               = 4096
+  cores                = 8
+  memory               = 16384
   sockets              = 1
   cpu_type             = "host"
   network_adapters {

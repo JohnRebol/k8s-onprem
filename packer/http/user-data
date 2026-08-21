@@ -2,6 +2,17 @@
 
 autoinstall:
   version: 1
+  locale: en_US.UTF-8
+  keyboard:
+    layout: us
+
+  network:
+    version: 2
+    ethernets:
+      any-ens:
+        match:
+          name: en*
+        dhcp4: true
 
   ssh:
     install-server: true
@@ -23,18 +34,6 @@ autoinstall:
   - qemu-guest-agent
   - openssh-server
 
-keyboard:
-  layout: us
-
-users:
-  - name: ${ssh_username}
-    gecos: Kubernetes image builder
-    groups: [adm, sudo]
-    shell: /bin/bash
-    sudo: ALL=(ALL) NOPASSWD:ALL
-    ssh_authorized_keys:
-      - ${ssh_public_key}
-
-ssh_pwauth: false
-package_update: true
-package_upgrade: false
+  late-commands:
+    - echo '${ssh_username} ALL=(ALL) NOPASSWD:ALL' > /target/etc/sudoers.d/90-${ssh_username}
+    - chmod 440 /target/etc/sudoers.d/90-${ssh_username}
