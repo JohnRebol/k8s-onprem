@@ -63,9 +63,21 @@ fi
 
 systemctl enable ssh
 
-rm -f /etc/machine-id
+# Ubuntu's live installer seals the machine against cloud-init once autoinstall
+# finishes, so the installed system won't re-run it like a fresh cloud instance.
+# Those artifacts survive into the template and stop every clone from reading the
+# cloud-init drive Proxmox attaches (datasource_list is pinned to None, and
+# networking is disabled outright), leaving nodes on DHCP with the template's
+# hostname. Unseal the image so clones pick up their per-VM config.
+rm -f /etc/cloud/cloud-init.disabled
+rm -f /etc/cloud/cloud.cfg.d/99-installer.cfg
+rm -f /etc/cloud/cloud.cfg.d/*subiquity-disable-cloudinit-networking.cfg
+cat >/etc/cloud/cloud.cfg.d/99-pve.cfg <<EOF
+datasource_list: [ NoCloud, ConfigDrive ]
+EOF
+
+cloud-init clean --logs --seed --machine-id
 rm -f /var/lib/dbus/machine-id
-rm -rf /var/lib/cloud/*
 truncate -s 0 /etc/hostname
 rm -f /etc/ssh/ssh_host_*
 
