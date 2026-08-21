@@ -1,4 +1,5 @@
 .variables_to_set.txt
+.env
 packer/*.pkrvars.hcl
 packer/*.pkrvars.json
 packer/variables.auto.pkrvars.hcl.example
