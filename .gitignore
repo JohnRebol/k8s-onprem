@@ -11,6 +11,17 @@ packer/*.pkrvars.json
 # iso_download_pve = true (Proxmox fetches the ISO itself, server-side).
 packer/*.iso
 packer/downloaded_iso_path/
+variables.auto.pkrvars.hcl
+
+variables.auto.pkrvars.hcl
+packer/variables.auto.pkrvars.hcl.example
+
+# Packer (Windows 11)
+packer-windows11/*.pkrvars.hcl
+packer-windows11/*.pkrvars.json
+packer-windows11/*.iso
+packer-windows11/downloaded_iso_path/
+variables.auto.pkrvars.hcl
 
 # Terraform
 terraform/*.tfvars
