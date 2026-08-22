@@ -4,7 +4,7 @@ Builds a Proxmox VM template for a Windows 11 desktop with Brave, Blue Iris,
 and Tailscale preinstalled. Sibling to [../packer](../packer) (the Kubernetes
 golden image) -- same repo, same Proxmox host, unrelated purpose. Unlike that
 project, this one isn't part of the k8s skills-ladder curriculum this repo is
-otherwise scoped to (see [../CLAUDE.md](../CLAUDE.md)); it's a practical
+otherwise scoped to (see [../.CLAUDE.md](../.CLAUDE.md)); it's a practical
 utility that happens to reuse the same Packer + Proxmox pattern.
 
 ## How the build works
