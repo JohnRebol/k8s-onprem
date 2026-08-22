@@ -1,0 +1,25 @@
+# proxmox_url, proxmox_api_token_id, and proxmox_api_token_secret are supplied
+# via .env (PKR_VAR_*) -- see ../README.md's "Secrets" section. winrm_password
+# is new to this project (../packer only ever needed an SSH key) -- add
+# PKR_VAR_winrm_password to .env alongside the others.
+proxmox_node     = "pve2"
+datastore_id     = "nvmePCI_ZFS"
+iso_datastore_id = "nvmePCI_dir"
+network_bridge   = "vmbr0"
+
+# Upload a Windows 11 ISO to the iso_datastore_id above by hand first (see
+# windows11.pkr.hcl's windows_iso_file description for why this can't be
+# fetched automatically), then build the no-prompt variant from it (see
+# README.md's "Building the no-prompt ISO") and point this at THAT one --
+# not the plain uploaded ISO, or every build races an unwinnable keypress.
+windows_iso_file = "nvmePCI_dir:iso/Win11_25H2_English_x64_v2-noprompt.iso"
+
+windows_template_vm_id = 9005
+computer_name          = "win11-golden"
+timezone               = "UTC"
+
+# cd packer-windows11
+# set -a; source ../.env; set +a
+# packer init .
+# packer validate -var-file=variables.auto.pkrvars.hcl .
+# packer build -var-file=variables.auto.pkrvars.hcl .
