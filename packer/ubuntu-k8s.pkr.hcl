@@ -95,7 +95,7 @@ variable "ssh_private_key_file" {
 
 variable "k8s_template_vm_id" {
   type        = number
-  default     = 9001
+  default     = 9003
   description = "VM ID assigned to the Kubernetes golden image."
 }
 

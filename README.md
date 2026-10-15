@@ -4,7 +4,7 @@ Builds a Kubernetes cluster on an on-premises Proxmox host, in two stages:
 
 | Stage | Tool | What it does | Runs from |
 | --- | --- | --- | --- |
-| 1. Golden image | Packer | Installs Ubuntu + containerd + Kubernetes tooling once, saves it as a reusable Proxmox **template** (VM 9001; 9000 retained for rollback) | `packer/` |
+| 1. Golden image | Packer | Installs Ubuntu + containerd + Kubernetes tooling once, saves it as a reusable Proxmox **template** (VM 9003; 9000 retained for rollback) | `packer/` |
 | 2. Cluster | Terraform | Clones that template into a control-plane node and N workers, then runs `kubeadm` to form the cluster | `terraform/` |
 
 Stage 1 is slow (~15 minutes) and runs rarely. Stage 2 is fast and runs whenever

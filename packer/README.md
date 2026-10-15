@@ -51,9 +51,9 @@ worktree and stamps the clean commit SHA and UTC build time into the image.
 packer build -force -var-file=variables.auto.pkrvars.hcl .
 ```
 
-This deletes template 9001 and rebuilds it. Template 9000 remains untouched as
+This deletes template 9003 and rebuilds it. Template 9000 remains untouched as
 the rollback image. Existing cluster nodes are full clones, so they keep running.
-Terraform is switched to 9001 separately after a test clone passes.
+Terraform is switched to 9003 separately after a test clone passes.
 
 ## What the image contains
 
