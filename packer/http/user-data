@@ -35,7 +35,7 @@ autoinstall:
 
   ssh:
     install-server: true
-    allow-pw: true
+    allow-pw: false
     authorized-keys:
       - "${ssh_public_key}"
 
@@ -70,7 +70,7 @@ autoinstall:
     - |
       cat > /target/etc/sudoers.d/90-${ssh_username} <<'EOF'
       ${ssh_username} ALL=(ALL) NOPASSWD:ALL
-      Defaults:${ssh_username} env_keep += "KUBERNETES_REPO_VERSION HOLD_KUBERNETES_PACKAGES"
+      Defaults:${ssh_username} env_keep += "KUBERNETES_REPO_VERSION KUBERNETES_VERSION KUBERNETES_PACKAGE_VERSION CONTAINERD_PACKAGE_VERSION PACKER_REPO_GIT_SHA BUILD_DATE_UTC"
       EOF
     # sudo refuses to read a sudoers file with looser permissions than 0440.
     - chmod 440 /target/etc/sudoers.d/90-${ssh_username}

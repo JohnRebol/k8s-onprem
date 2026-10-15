@@ -14,9 +14,8 @@ packer {
   required_plugins {
     proxmox = {
       source = "github.com/hashicorp/proxmox"
-      # ">=" allows newer plugin releases. The exact version actually used is
-      # recorded in the lock file written by `packer init`.
-      version = ">= 1.2.0"
+      # Packer has no lock file; this exact constraint pins the plugin version.
+      version = "1.2.4"
     }
   }
 }
@@ -96,20 +95,42 @@ variable "ssh_private_key_file" {
 
 variable "k8s_template_vm_id" {
   type        = number
-  default     = 9000
+  default     = 9001
   description = "VM ID assigned to the Kubernetes golden image."
 }
 
 variable "kubernetes_repo_version" {
   type        = string
-  default     = "v1.35"
+  default     = "v1.36"
   description = "Kubernetes apt repository version."
 }
 
-variable "hold_kubernetes_packages" {
-  type        = bool
-  default     = true
-  description = "Hold kubelet, kubeadm, and kubectl after installation."
+variable "kubernetes_version" {
+  type        = string
+  default     = "v1.36.5"
+  description = "Exact Kubernetes release installed in the image."
+}
+
+variable "kubernetes_package_version" {
+  type        = string
+  default     = "1.36.5-1.1"
+  description = "Exact apt version for kubelet, kubeadm, and kubectl."
+}
+
+variable "containerd_package_version" {
+  type        = string
+  default     = "2.2.2-0ubuntu1.1"
+  description = "Exact Ubuntu containerd package version."
+}
+
+variable "packer_repo_git_sha" {
+  type        = string
+  description = "Clean Packer repo commit SHA, supplied by build.sh."
+}
+
+variable "build_date_utc" {
+  type        = string
+  description = "UTC build timestamp, supplied by build.sh."
 }
 
 # "proxmox-iso" means: build from an installer ISO rather than from an existing
@@ -127,8 +148,8 @@ source "proxmox-iso" "ubuntu-k8s" {
   insecure_skip_tls_verify = true
 
   vm_id                = var.k8s_template_vm_id
-  vm_name              = "k8s-ubuntu-${var.ubuntu_version}-golden"
-  template_name        = "k8s-ubuntu-${var.ubuntu_version}-golden"
+  vm_name              = "k8s-ubuntu-${var.ubuntu_version}-k8s-${var.kubernetes_version}-golden"
+  template_name        = "k8s-ubuntu-${var.ubuntu_version}-k8s-${var.kubernetes_version}-golden"
   template_description = "Kubernetes golden image for the on-premises cluster"
   # The QEMU guest agent lets Proxmox see inside the VM -- report IPs, shut down
   # cleanly. Terraform waits on it, and the package is installed by autoinstall.
@@ -249,7 +270,11 @@ build {
 
     environment_vars = [
       "KUBERNETES_REPO_VERSION=${var.kubernetes_repo_version}",
-      "HOLD_KUBERNETES_PACKAGES=${var.hold_kubernetes_packages}",
+      "KUBERNETES_VERSION=${var.kubernetes_version}",
+      "KUBERNETES_PACKAGE_VERSION=${var.kubernetes_package_version}",
+      "CONTAINERD_PACKAGE_VERSION=${var.containerd_package_version}",
+      "PACKER_REPO_GIT_SHA=${var.packer_repo_git_sha}",
+      "BUILD_DATE_UTC=${var.build_date_utc}",
     ]
   }
 }

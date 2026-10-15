@@ -4,7 +4,7 @@ Builds an Ubuntu Proxmox template with containerd and the Kubernetes packages
 preinstalled. Terraform clones this template to create cluster nodes — see
 [../terraform/README.md](../terraform/README.md).
 
-Cluster-specific values (node IPs, VM IDs, sizing) deliberately live in the
+Cluster-specific values (node IPs, sizing) deliberately live in the
 Terraform config, not here. The image is meant to be reusable: nothing inside it
 should know which node it will become.
 
@@ -29,11 +29,15 @@ set -a; source ../.env; set +a                                     # see repo-ro
 
 packer init .                                              # download the Proxmox plugin
 packer fmt -check .                                        # formatting
-packer validate -var-file=variables.auto.pkrvars.hcl .     # config errors, without building
-packer build -var-file=variables.auto.pkrvars.hcl .
+packer validate -var-file=variables.auto.pkrvars.hcl \
+  -var "packer_repo_git_sha=$(git rev-parse HEAD)" \
+  -var "build_date_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)" .
+./build.sh                                                # clean-tree check + stamped build
 ```
 
 Run it under `tmux` — closing your SSH session otherwise kills the build.
+Commit the Packer changes before running `build.sh`; it refuses a tracked dirty
+worktree and stamps the clean commit SHA and UTC build time into the image.
 
 `variables.auto.pkrvars.hcl` holds environment-specific, non-secret values
 (which Proxmox node, which datastore). Connection details and keys come from
@@ -47,22 +51,38 @@ Run it under `tmux` — closing your SSH session otherwise kills the build.
 packer build -force -var-file=variables.auto.pkrvars.hcl .
 ```
 
-This deletes template 9000 and rebuilds it. Existing cluster nodes are full
-clones, so they keep running — but they still contain the *old* image until
-Terraform recreates them.
+This deletes template 9001 and rebuilds it. Template 9000 remains untouched as
+the rollback image. Existing cluster nodes are full clones, so they keep running.
+Terraform is switched to 9001 separately after a test clone passes.
 
 ## What the image contains
 
 Installed and configured by `scripts/provision-k8s.sh`:
 
-- **containerd** as the container runtime, with systemd cgroups (Kubernetes
-  requires the runtime and kubelet to agree on the cgroup driver)
-- **kubelet, kubeadm, kubectl**, held at their installed version so an
-  unattended `apt upgrade` cannot skew the cluster mid-life
+- **containerd 2.2.2-0ubuntu1.1**, held alongside the Kubernetes packages so
+  unattended upgrades cannot restart the runtime or skew a node
+- **kubelet, kubeadm, kubectl 1.36.5-1.1**, held for deliberate Kubernetes
+  upgrades; other Ubuntu security updates remain enabled
 - **crictl** for debugging containers directly against containerd, below
   Kubernetes — often the only thing that works when the control plane is down
-- swap disabled, `overlay` + `br_netfilter` modules, and the sysctls Kubernetes
-  networking needs
+- chrony as the only enabled time daemon; `systemd-timesyncd` is disabled and
+  masked
+- swap disabled, `overlay` + `br_netfilter` modules, Kubernetes networking
+  sysctls, and inotify limits for monitoring and pod density
+- cloud-init defaults to the `deploy` account with key-based SSH and
+  passwordless sudo; the temporary `ubuntu` build account is locked and removed
+  from SSH/sudo access during Packer's final shutdown command
+- `/etc/golden-image-release` records Kubernetes, containerd, cri-tools, build
+  timestamp, and source commit
+
+The image does not install NFS packages; local-path-provisioner is installed
+later in-cluster. Patching policy: Ubuntu security updates remain enabled, while
+containerd and the three Kubernetes packages are held for manual updates.
+
+The Proxmox NIC firewall is enabled on the template. Before rollout, verify the
+effective datacenter, node, and VM firewall rules permit TCP 6443 inbound to the
+control plane, TCP 10250 from the control plane to kubelets, and UDP 4789
+bidirectionally between nodes for Calico VXLAN.
 - **cloud-init unsealed** — see below
 
 ### The cloud-init unseal

@@ -11,6 +11,8 @@ ubuntu_iso_url       = "https://releases.ubuntu.com/26.04/ubuntu-26.04-live-serv
 ubuntu_iso_checksum  = "file:https://releases.ubuntu.com/26.04/SHA256SUMS"
 ssh_username         = "<username>"
 
-k8s_template_vm_id       = 9000
-kubernetes_repo_version  = "v1.35"
-hold_kubernetes_packages = true
+k8s_template_vm_id          = 9001
+kubernetes_repo_version     = "v1.36"
+kubernetes_version          = "v1.36.5"
+kubernetes_package_version  = "1.36.5-1.1"
+containerd_package_version  = "2.2.2-0ubuntu1.1"

@@ -9,11 +9,14 @@
 # set -o pipefail  make a pipeline fail if any stage fails, not just the last
 set -euo pipefail
 
-# Both values are passed in by Packer (environment_vars in ubuntu-k8s.pkr.hcl).
-# The ":-" fallbacks keep the script runnable by hand for debugging, and stop
-# `set -u` from aborting if a variable didn't survive the sudo boundary.
-KUBERNETES_REPO_VERSION="${KUBERNETES_REPO_VERSION:-v1.35}"
-HOLD_KUBERNETES_PACKAGES="${HOLD_KUBERNETES_PACKAGES:-true}"
+# Build inputs are passed in by Packer (environment_vars in
+# ubuntu-k8s.pkr.hcl). Defaults keep the script runnable by hand for debugging.
+KUBERNETES_REPO_VERSION="${KUBERNETES_REPO_VERSION:-v1.36}"
+KUBERNETES_VERSION="${KUBERNETES_VERSION:-v1.36.5}"
+KUBERNETES_PACKAGE_VERSION="${KUBERNETES_PACKAGE_VERSION:-1.36.5-1.1}"
+CONTAINERD_PACKAGE_VERSION="${CONTAINERD_PACKAGE_VERSION:-2.2.2-0ubuntu1.1}"
+PACKER_REPO_GIT_SHA="${PACKER_REPO_GIT_SHA:-unknown}"
+BUILD_DATE_UTC="${BUILD_DATE_UTC:-unknown}"
 
 # Stop apt from trying to open interactive prompts; there is no terminal here.
 export DEBIAN_FRONTEND=noninteractive
@@ -26,7 +29,7 @@ apt-get install -y \
   qemu-guest-agent \
   openssh-server \
   conntrack \
-  containerd \
+  "containerd=${CONTAINERD_PACKAGE_VERSION}" \
   socat \
   ebtables \
   ipset \
@@ -35,7 +38,7 @@ apt-get install -y \
   ca-certificates \
   curl \
   gpg \
-  systemd-timesyncd
+  chrony
 
 # Add the Kubernetes apt repository. Ubuntu's own repos do not carry kubeadm.
 #
@@ -44,7 +47,7 @@ apt-get install -y \
 # than trusting it to sign anything on the system.
 #
 # The URL is easy to get subtly wrong: the path needs a slash after "stable:"
-# ("core:/stable:/v1.35/"). Without it the CDN answers 403 rather than 404, so
+# ("core:/stable:/v1.36/"). Without it the CDN answers 403 rather than 404, so
 # it reads like an outage or a rate limit instead of a typo.
 install -d -m 0755 /etc/apt/keyrings
 curl -fsSL --retry 5 --retry-delay 5 \
@@ -60,7 +63,11 @@ apt-get update
 # tracks the cluster version. It talks to containerd below Kubernetes, which is
 # often the only way to see what a node is doing when the control plane itself
 # is the thing that's broken.
-apt-get install -y kubelet kubeadm kubectl cri-tools
+apt-get install -y \
+  "kubelet=${KUBERNETES_PACKAGE_VERSION}" \
+  "kubeadm=${KUBERNETES_PACKAGE_VERSION}" \
+  "kubectl=${KUBERNETES_PACKAGE_VERSION}" \
+  cri-tools
 
 # Kubernetes requires swap to be off: the scheduler reasons about a node's real
 # memory, and swap lets a node quietly exceed it instead of reporting pressure.
@@ -87,6 +94,8 @@ cat >/etc/sysctl.d/99-kubernetes-cri.conf <<EOF
 net.bridge.bridge-nf-call-iptables = 1
 net.bridge.bridge-nf-call-ip6tables = 1
 net.ipv4.ip_forward = 1
+fs.inotify.max_user_watches = 524288
+fs.inotify.max_user_instances = 512
 EOF
 sysctl --system
 
@@ -99,6 +108,25 @@ sysctl --system
 install -d -m 0755 /etc/containerd
 containerd config default >/etc/containerd/config.toml
 sed -ri 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
+sed -ri 's|config_path = ""|config_path = "/etc/containerd/certs.d"|' /etc/containerd/config.toml
+
+if ! grep -Eq '^[[:space:]]*SystemdCgroup = true$' /etc/containerd/config.toml; then
+  echo "containerd config is missing SystemdCgroup = true" >&2
+  exit 1
+fi
+if ! grep -Fq 'config_path = "/etc/containerd/certs.d"' /etc/containerd/config.toml; then
+  echo "containerd registry config_path was not set" >&2
+  exit 1
+fi
+
+KUBEADM_PAUSE_IMAGE="$(kubeadm config images list --kubernetes-version "${KUBERNETES_VERSION}" | awk '/pause:/ { print; count++ } END { if (count != 1) exit 1 }')"
+sed -ri "s|^([[:space:]]*sandbox_image[[:space:]]*=[[:space:]]*).*$|\\1\"${KUBEADM_PAUSE_IMAGE}\"|" /etc/containerd/config.toml
+CONTAINERD_PAUSE_IMAGE="$(sed -nE 's/^[[:space:]]*sandbox_image[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' /etc/containerd/config.toml)"
+if [[ "${CONTAINERD_PAUSE_IMAGE}" != "${KUBEADM_PAUSE_IMAGE}" ]]; then
+  echo "containerd sandbox image ${CONTAINERD_PAUSE_IMAGE} does not match kubeadm image ${KUBEADM_PAUSE_IMAGE}" >&2
+  exit 1
+fi
+
 systemctl enable --now containerd
 
 # Point crictl at containerd. Without this it has to guess an endpoint on every
@@ -110,17 +138,38 @@ image-endpoint: unix:///run/containerd/containerd.sock
 timeout: 10
 EOF
 systemctl enable qemu-guest-agent
-# Kubernetes certificates and etcd leader election are time-sensitive; a node
-# with a drifting clock fails to authenticate in confusing ways.
-systemctl enable systemd-timesyncd
+# Kubernetes certificates and etcd leader election are time-sensitive. Keep one
+# NTP client enabled so there is no competition over clock discipline.
+systemctl disable --now systemd-timesyncd
+systemctl mask systemd-timesyncd
+systemctl enable --now chrony
 
-# "hold" pins these at the installed version so an unattended apt upgrade cannot
-# move a node to a new Kubernetes minor on its own. Kubernetes upgrades have a
-# required order (control plane before workers, one minor at a time), so they
-# should be deliberate rather than incidental.
-if [[ "${HOLD_KUBERNETES_PACKAGES}" == "true" ]]; then
-  apt-mark hold kubelet kubeadm kubectl
+# Hold the runtime and Kubernetes components. Ubuntu security updates remain
+# enabled for other packages; these four packages are updated deliberately.
+apt-mark hold containerd kubelet kubeadm kubectl
+
+if [[ "${PACKER_REPO_GIT_SHA}" == "unknown" || "${BUILD_DATE_UTC}" == "unknown" ]]; then
+  echo "Build stamp inputs must be supplied by packer/build.sh" >&2
+  exit 1
 fi
+if [[ ! "${PACKER_REPO_GIT_SHA}" =~ ^[0-9a-f]{40,64}$ ]]; then
+  echo "Packer repo git SHA is invalid" >&2
+  exit 1
+fi
+if ! date -u -d "${BUILD_DATE_UTC}" >/dev/null; then
+  echo "Build date must be a valid UTC timestamp" >&2
+  exit 1
+fi
+CONTAINERD_VERSION="$(dpkg-query -W -f='${Version}' containerd)"
+CRI_TOOLS_VERSION="$(dpkg-query -W -f='${Version}' cri-tools)"
+cat >/etc/golden-image-release <<EOF
+Kubernetes version: ${KUBERNETES_VERSION}
+Kubernetes package version: ${KUBERNETES_PACKAGE_VERSION}
+containerd version: ${CONTAINERD_VERSION}
+cri-tools version: ${CRI_TOOLS_VERSION}
+Build date UTC: ${BUILD_DATE_UTC}
+Packer repo git SHA: ${PACKER_REPO_GIT_SHA}
+EOF
 
 systemctl enable ssh
 
@@ -135,6 +184,15 @@ rm -f /etc/cloud/cloud.cfg.d/99-installer.cfg
 rm -f /etc/cloud/cloud.cfg.d/*subiquity-disable-cloudinit-networking.cfg
 cat >/etc/cloud/cloud.cfg.d/99-pve.cfg <<EOF
 datasource_list: [ NoCloud, ConfigDrive ]
+EOF
+cat >/etc/cloud/cloud.cfg.d/99-default-user.cfg <<'EOF'
+system_info:
+  default_user:
+    name: deploy
+    lock_passwd: true
+    shell: /bin/bash
+    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+    groups: []
 EOF
 
 # Strip this machine's identity so clones do not all share one. Anything unique
@@ -157,3 +215,7 @@ rm -f /etc/ssh/ssh_host_*
 # with no useful error.
 apt-get clean
 rm -rf /var/lib/apt/lists/* /var/tmp/*
+
+passwd -l ubuntu
+chage -E 0 ubuntu
+rm -f /home/ubuntu/.ssh/authorized_keys /etc/sudoers.d/90-ubuntu
